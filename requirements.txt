@@ -1,0 +1,7 @@
+django
+djangorestframework
+pypdf
+sumy
+nltk
+numpy
+scipy
