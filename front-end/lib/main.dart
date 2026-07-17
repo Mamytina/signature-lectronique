@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
 
 
@@ -18,7 +18,8 @@ class MyApp extends StatelessWidget{
   Widget build(BuildContext context){
 
     return MaterialApp(
-
+      title: 'docsigne',
+      theme: AppTheme.light,
       debugShowCheckedModeBanner:false,
 
       home: LoginPage(),

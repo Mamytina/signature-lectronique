@@ -25,3 +25,6 @@ def extract_text_pdf(file_path):
 
     else:
         return "Format non supporté"
+    
+
+

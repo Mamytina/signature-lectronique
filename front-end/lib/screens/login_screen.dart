@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/signature_flourish.dart';
 import 'user_home_page.dart';
+import 'register_screen.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,204 +15,218 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  // LOGIN
-  final loginEmail = TextEditingController();
-  final loginPassword = TextEditingController();
-
-  // REGISTER
-  final firstName = TextEditingController();
-  final lastName = TextEditingController();
-  final registerUsername = TextEditingController();
-  final email = TextEditingController();
-  final registerPassword = TextEditingController();
-  final confirmPassword = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
 
   bool isLoading = false;
+  bool isGoogleLoading = false;
+  bool obscurePassword = true;
+  String? errorMessage;
+
+  static const String _webClientId =
+      "830510299154-hlo0f892j7vd278m8itrj1h91e32qdoa.apps.googleusercontent.com";
+
+  late final GoogleSignIn _googleSignIn = GoogleSignIn(
+  scopes: ['email', 'openid', 'profile'],
+  clientId: kIsWeb ? _webClientId : null,
+  serverClientId: kIsWeb ? null : _webClientId,
+);
 
   @override
   void dispose() {
-    loginEmail.dispose();
-    loginPassword.dispose();
-    firstName.dispose();
-    lastName.dispose();
-    registerUsername.dispose();
-    email.dispose();
-    registerPassword.dispose();
-    confirmPassword.dispose();
+    emailController.dispose();
+    passwordController.dispose();
     super.dispose();
   }
 
   void login() async {
-    if (loginEmail.text.isEmpty || loginPassword.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez remplir tous les champs")),
-      );
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      setState(() => errorMessage = "Renseignez votre email et votre mot de passe");
       return;
     }
 
-    setState(() => isLoading = true);
+    setState(() { isLoading = true; errorMessage = null; });
 
     try {
-      final result = await ApiService.login(
-        loginEmail.text.trim(),
-        loginPassword.text,
-      );
-
-      print("Connexion réussie : $result");
-
+      await ApiService.login(emailController.text.trim(), passwordController.text);
       if (!mounted) return;
-
-      //Redirection vers la page d'accueil après connexion
-         Navigator.pushReplacement(
-          context,
-       MaterialPageRoute(builder: (_) => const UserHomePage()),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const UserHomePage()),
+        (route) => false,
       );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Connexion réussie")),
-      );
-
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur : ${e.toString().replaceAll('Exception: ', '')}")),
-      );
+      setState(() => errorMessage = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  void register() async {
-    setState(() => isLoading = true);
+  Future<void> signInWithGoogle() async {
+    setState(() { isGoogleLoading = true; errorMessage = null; });
 
     try {
-      final result = await ApiService.register(
-        firstName.text,
-        lastName.text,
-        registerUsername.text,
-        email.text,
-        registerPassword.text,
-        confirmPassword.text,
-      );
+      await _googleSignIn.signOut();
+      final GoogleSignInAccount? account = await _googleSignIn.signIn();
 
-      print("Inscription réussie : $result");
+      if (account == null) {
+        setState(() => isGoogleLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication auth = await account.authentication;
+      final String? idToken = auth.idToken;
+
+      if (idToken == null) {
+        throw Exception("Connexion Google incomplète, réessayez");
+      }
+
+      await ApiService.loginWithGoogle(idToken);
 
       if (!mounted) return;
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Compte créé avec succès")),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const UserHomePage()),
+        (route) => false,
       );
-
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur : ${e.toString().replaceAll('Exception: ', '')}")),
-      );
+      setState(() => errorMessage = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) setState(() => isGoogleLoading = false);
     }
-  }
-
-  void showRegisterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Créer un compte"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: firstName,
-                  decoration: const InputDecoration(labelText: "Nom"),
-                ),
-                TextField(
-                  controller: lastName,
-                  decoration: const InputDecoration(labelText: "Prénom"),
-                ),
-                TextField(
-                  controller: registerUsername,
-                  decoration: const InputDecoration(labelText: "Pseudo"),
-                ),
-                TextField(
-                  controller: email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: "Email"),
-                ),
-                TextField(
-                  controller: registerPassword,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: "Mot de passe"),
-                ),
-                TextField(
-                  controller: confirmPassword,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: "Confirmation mot de passe",
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Annuler"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (registerPassword.text != confirmPassword.text) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Les mots de passe ne correspondent pas"),
-                    ),
-                  );
-                  return;
-                }
-                Navigator.pop(context); // ferme le dialog
-                register();
-              },
-              child: const Text("Enregistrer"),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Connexion")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(
-              controller: loginEmail,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: "Email"),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: loginPassword,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: "Password"),
-            ),
-            const SizedBox(height: 20),
-            isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: login,
-                    child: const Text("Connexion"),
+      backgroundColor: AppColors.paper,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("docsigne", style: Theme.of(context).textTheme.displaySmall),
+                  const SizedBox(height: 6),
+                  const SignatureFlourish(width: 110),
+                  const SizedBox(height: 18),
+                  Text(
+                    "Signez vos documents, simplement.",
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-            TextButton(
-              onPressed: isLoading ? null : showRegisterDialog,
-              child: const Text("Créer un compte"),
+                  const SizedBox(height: 40),
+
+                  if (errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                      decoration: const BoxDecoration(
+                        border: Border(left: BorderSide(color: AppColors.error, width: 3)),
+                      ),
+                      child: Text(
+                        errorMessage!,
+                        style: const TextStyle(color: AppColors.error, fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(fontSize: 15, color: AppColors.inkDark),
+                    decoration: const InputDecoration(labelText: "Adresse email"),
+                  ),
+                  const SizedBox(height: 24),
+
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscurePassword,
+                    style: const TextStyle(fontSize: 15, color: AppColors.inkDark),
+                    decoration: InputDecoration(
+                      labelText: "Mot de passe",
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          size: 20, color: AppColors.slate,
+                        ),
+                        onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                      ),
+                    ),
+                    onSubmitted: (_) => login(),
+                  ),
+                  const SizedBox(height: 40),
+
+                  ElevatedButton(
+                    onPressed: isLoading ? null : login,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text("Se connecter"),
+                  ),
+                  const SizedBox(height: 24),
+
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: AppColors.line, height: 1)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Text("ou", style: Theme.of(context).textTheme.bodySmall),
+                      ),
+                      const Expanded(child: Divider(color: AppColors.line, height: 1)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  OutlinedButton(
+                    onPressed: isGoogleLoading ? null : signInWithGoogle,
+                    child: isGoogleLoading
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 22, height: 22,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.fromBorderSide(BorderSide(color: AppColors.ink, width: 1.2)),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Text("G", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                              ),
+                              const SizedBox(width: 10),
+                              const Text("Continuer avec Google"),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text("Pas encore de compte ?", style: Theme.of(context).textTheme.bodyMedium),
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RegisterPage()),
+                        ),
+                        child: const Text("S'inscrire"),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );

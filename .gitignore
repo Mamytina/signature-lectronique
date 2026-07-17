@@ -8,3 +8,8 @@ media/
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Secrets Google OAuth / Gmail API
+credentials.json
+token.pickle
+front-end/android/app/google-services.json

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'sign_document_page.dart';
+import 'view_signed_document_page.dart';
 
 class DocumentDetailPage extends StatefulWidget {
   final int documentId;
@@ -119,6 +121,20 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
     // donc rien de plus à faire ici pour la persistance.
   }
 
+  void openSignPage() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SignDocumentPage(documentId: widget.documentId),
+      ),
+    );
+
+    // Si la signature a été validée, on recharge le document
+    if (result != null) {
+      loadDocument();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -179,6 +195,47 @@ class _DocumentDetailPageState extends State<DocumentDetailPage> {
                                 }
                               },
                             ),
+
+                      const Divider(height: 32),
+
+                      const Text("Signature", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+
+                      if (document?["status"] == "signed")
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green),
+                                SizedBox(width: 8),
+                                Text("Document signé"),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                           if (document?["signed_file"] != null)
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.picture_as_pdf),
+                                label: const Text("Voir le document signé"),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ViewSignedDocumentPage(
+                                        documentId: widget.documentId,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        )
+                      else
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.draw),
+                          label: const Text("Signer le document"),
+                          onPressed: openSignPage,
+                        ),
                     ],
                   ),
                 ),

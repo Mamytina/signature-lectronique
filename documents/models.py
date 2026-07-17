@@ -107,3 +107,22 @@ class EmailHistory(models.Model):
 
     def __str__(self):
         return f"{self.document.title} - {self.status}"
+    
+
+class UserSignature(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="signature_profile"
+    )
+
+    signature = models.ImageField(
+        upload_to="signatures/",
+        blank=True,
+        null=True
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Signature de {self.user.username}"
